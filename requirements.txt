@@ -5,3 +5,5 @@ yfinance
 plotly
 requests
 google-genai
+python-pptx
+fpdf2
