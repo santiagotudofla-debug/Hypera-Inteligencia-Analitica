@@ -1,7 +1,0 @@
-pandas
-numpy
-streamlit
-yfinance
-plotly
-requests
-google-genai
