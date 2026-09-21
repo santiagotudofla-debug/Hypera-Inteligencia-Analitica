@@ -10,11 +10,30 @@ st.set_page_config(
 
 injetar_css()
 
-st.sidebar.title("📊 Hypera Analytics")
-st.sidebar.markdown("**HYPE3** — Inteligência Financeira (Dados Reais CVM & B3)")
+# Registra as páginas no sistema de navegação ocultando o menu padrão (forced to the top)
+p1 = st.Page("pages/1_Visao_Corporativa.py", title="Visão Corporativa", icon="🌍")
+p2 = st.Page("pages/2_Desempenho_Financeiro.py", title="Desempenho Financeiro", icon="💰")
+p3 = st.Page("pages/3_Inteligencia_e_Risco.py", title="Inteligência & Risco", icon="🔎")
+p4 = st.Page("pages/4_Hypera_AI_Analyst.py", title="Hypera AI Analyst", icon="🧠")
+p5 = st.Page("pages/5_Metodologia.py", title="Metodologia", icon="📚")
+
+pg = st.navigation([p1, p2, p3, p4, p5], position="hidden")
+
+# --- CONSTRUÇÃO MANUAL DA BARRA LATERAL (Para controlar a ordem) ---
+st.sidebar.title("🌱 Hypera ESG & Analytics")
+st.sidebar.markdown("**HYPE3** — Inteligência Financeira e Sustentabilidade Corporativa (Dados Reais CVM & B3)")
 st.sidebar.markdown("---")
 
-if st.sidebar.button("🔄 Atualizar Dados Agora"):
+# Renderizamos os links de página na ordem que quisermos
+st.sidebar.page_link(p1, label="Visão Corporativa", icon="🌍")
+st.sidebar.page_link(p2, label="Desempenho Financeiro", icon="💰")
+st.sidebar.page_link(p3, label="Inteligência & Risco", icon="🔎")
+st.sidebar.page_link(p4, label="Hypera AI Analyst", icon="🧠")
+st.sidebar.page_link(p5, label="Metodologia", icon="📚")
+
+st.sidebar.markdown("---")
+
+if st.sidebar.button("🔄 Atualizar Dados Agora", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
 
@@ -23,11 +42,5 @@ st.sidebar.info(
     "**Aviso Legal:** Plataforma integrada com fontes públicas oficiais (CVM, B3 e Relatórios de Sustentabilidade) em tempo real."
 )
 
-p1 = st.Page("pages/1_Visao_Corporativa.py", title="Visão Corporativa", icon="🌍")
-p2 = st.Page("pages/2_Desempenho_Financeiro.py", title="Desempenho Financeiro", icon="💰")
-p3 = st.Page("pages/3_Inteligencia_e_Risco.py", title="Inteligência & Risco", icon="🔎")
-p4 = st.Page("pages/4_Hypera_AI_Analyst.py", title="Hypera AI Analyst", icon="🧠")
-p5 = st.Page("pages/5_Metodologia.py", title="Metodologia", icon="📚")
-
-pg = st.navigation([p1, p2, p3, p4, p5])
+# Executa a página selecionada
 pg.run()
