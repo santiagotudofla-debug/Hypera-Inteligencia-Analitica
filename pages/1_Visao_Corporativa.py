@@ -13,7 +13,7 @@ df_cvm_real = carregar_demonstrativos_cvm_real(ano_atual)
 if df_cvm_real.empty:
     df_cvm_real = carregar_demonstrativos_cvm_real(ano_atual - 1)
 
-tabs = st.tabs(["Visao Geral", "Noticias", "Mercado", "Analise Tecnica", "Portfolio e Sazonalidade", "Sustentabilidade & ODS"])
+tabs = st.tabs(["Visao Geral", "Mercado", "Analise Tecnica", "Portfolio e Sazonalidade", "Sustentabilidade & ODS"])
 
 with tabs[0]:
     st.title("📊 Painel Analítico CVM — Visão Geral (HYPE3)")
@@ -51,7 +51,7 @@ with tabs[0]:
         ))
         fig_gauge.update_layout(
             title = {'text': "Índice Geral HYPE3", 'x': 0.5, 'xanchor': 'center'},
-            template = "plotly_dark", 
+             
             height = 320, 
             margin = dict(t=50, b=10)
         )
@@ -67,45 +67,6 @@ with tabs[0]:
     
 
 with tabs[1]:
-    st.title("📰 Feed de Fatos Relevantes & Notícias — HYPE3")
-    st.markdown("Acompanhamento de comunicados oficiais e fatos relevantes protocolados na CVM em tempo real.")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(label="Fonte Principal", value="Portal CVM", delta="Oficial")
-    with col2:
-        st.metric(label="Status da API", value="Conectado", delta="Tempo Real")
-    with col3:
-        st.metric(label="Ativo Monitorado", value="HYPE3 (B3)", delta="Ativo")
-        
-    st.markdown("---")
-    st.subheader("📋 Últimas Notícias (Yahoo Finance)")
-    
-    ativo_news = yf.Ticker("HYPE3.SA").news
-    if ativo_news:
-        noticias_list = []
-        for n in ativo_news[:5]:
-            data_pub = datetime.fromtimestamp(n.get("providerPublishTime", 0)).strftime('%d/%m/%Y %H:%M')
-            noticias_list.append({
-                "Data": data_pub,
-                "Título": n.get("title", "Sem título"),
-                "Publicador": n.get("publisher", "Desconhecido"),
-                "Link": n.get("link", "#")
-            })
-        df_noticias = pd.DataFrame(noticias_list)
-        st.dataframe(
-            df_noticias,
-            column_config={
-                "Link": st.column_config.LinkColumn("Ler Notícia")
-            },
-            use_container_width=True, 
-            hide_index=True
-        )
-    else:
-        st.info("Nenhuma notícia recente encontrada.")
-    
-
-with tabs[2]:
     st.title("📈 Módulo de Mercado & Cotações Reais — HYPE3 (B3)")
     st.markdown("Dados de preços de fechamento e volume obtidos em tempo real via Yahoo Finance / B3.")
     
@@ -129,13 +90,13 @@ with tabs[2]:
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df_mercado_real['Date'], y=df_mercado_real['Close'], name="Fechamento Real", line=dict(color="#00d2ff")))
         fig.add_trace(go.Scatter(x=df_mercado_real['Date'], y=df_mercado_real['MA_7'], name="Média Móvel 7d", line=dict(color="#ff7f0e", dash="dash")))
-        fig.update_layout(template="plotly_dark", height=450, xaxis_title="Data", yaxis_title="Preço (R$)")
+        fig.update_layout( height=450, xaxis_title="Data", yaxis_title="Preço (R$)")
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("Não foi possível conectar ao provedor de mercado no momento.")
     
 
-with tabs[3]:
+with tabs[2]:
     st.title("📊 Análise Técnica & Indicadores — HYPE3")
     st.markdown("Estudo de momentum, volatilidade e tendências de curto e médio prazo.")
     
@@ -161,11 +122,11 @@ with tabs[3]:
         fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['IFR'], name="IFR (14)", line=dict(color="#ff7f0e")), row=2, col=1)
         fig_at.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1, annotation_text="Sobrecompra (70)", annotation_position="top right")
         fig_at.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1, annotation_text="Sobrevenda (30)", annotation_position="bottom right")
-        fig_at.update_layout(template="plotly_dark", height=600, hovermode="x unified", margin=dict(t=30, b=30))
+        fig_at.update_layout( height=600, hovermode="x unified", margin=dict(t=30, b=30))
         st.plotly_chart(fig_at, use_container_width=True)
     
 
-with tabs[4]:
+with tabs[3]:
     st.title("💊 Portfólio de Produtos & Sazonalidade de Vendas (HYPE3)")
     st.markdown("Análise inteligente do fluxo de saída de medicamentos e produtos de saúde conforme o período do ano.")
     
@@ -210,7 +171,7 @@ with tabs[4]:
     ])
     fig_saz.update_layout(
         barmode='group',
-        template="plotly_dark",
+        
         height=400,
         margin=dict(t=20, b=20, l=40, r=20),
         yaxis_title="Volume de Vendas (R$ Mi)",
@@ -221,7 +182,7 @@ with tabs[4]:
     st.info("💡 Nota Estratégica: Este cruzamento demonstra como a Hypera gerencia seu capital de giro e campanhas de marketing direcionadas para capturar os picos de demanda nas estações mais frias do ano.")
     
 
-with tabs[5]:
+with tabs[4]:
     st.title("🌱 Sustentabilidade, ESG & ODS — Hypera Pharma")
     st.markdown("Monitoramento de iniciativas alinhadas aos Objetivos de Desenvolvimento Sustentável (ODS) da ONU, com base nos relatórios públicos oficiais da companhia e índices da B3.")
     

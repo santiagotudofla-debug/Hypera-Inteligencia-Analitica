@@ -226,7 +226,7 @@ with tabs[2]:
     fig_f.add_trace(go.Scatter(x=anos_f, y=rec_f, name="Receita Líquida", line=dict(color="#00d2ff", width=2), mode='lines+markers'))
     fig_f.add_trace(go.Scatter(x=anos_f, y=luc_f, name="Lucro Líquido", line=dict(color="#2ca02c", width=2), mode='lines+markers'))
     fig_f.update_layout(
-        template="plotly_dark",
+        
         height=400,
         margin=dict(t=20, b=20, l=40, r=20),
         yaxis_title="R$ (Bilhões)",

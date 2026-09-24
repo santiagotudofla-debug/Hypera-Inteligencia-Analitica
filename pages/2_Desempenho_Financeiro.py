@@ -37,7 +37,7 @@ with tabs[0]:
     fig_radar = go.Figure()
     fig_radar.add_trace(go.Scatterpolar(r=[roe_val, roic_val, 85, margem_ebitda, margem_liq], theta=categories, fill='toself', name='Hypera Pharma (HYPE3)', line=dict(color='#00d2ff')))
     fig_radar.add_trace(go.Scatterpolar(r=[14.0, 10.5, 70, 25.0, 12.0], theta=categories, fill='toself', name='Média Setorial', line=dict(color='#ff7f0e')))
-    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor="gray", linecolor="gray")), template="plotly_dark", height=450, margin=dict(t=20, b=20, l=20, r=20), legend=dict(x=0.85, y=0.5))
+    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor="gray", linecolor="gray")),  height=450, margin=dict(t=20, b=20, l=20, r=20), legend=dict(x=0.85, y=0.5))
     st.plotly_chart(fig_radar, use_container_width=True)
     
 
@@ -68,7 +68,7 @@ with tabs[1]:
         )
     ])
     fig_res.update_layout(
-        template="plotly_dark",
+        
         height=400,
         margin=dict(t=20, b=80, l=40, r=20),
         xaxis_title="",
@@ -128,7 +128,7 @@ with tabs[2]:
         )
     ])
     fig_dfc.update_layout(
-        template="plotly_dark",
+        
         height=400,
         margin=dict(t=20, b=20, l=40, r=20),
         yaxis_title="R$ (Milhões)",
@@ -194,7 +194,7 @@ with tabs[3]:
         )
     ])
     fig_div.update_layout(
-        template="plotly_dark",
+        
         height=400,
         margin=dict(t=20, b=20, l=40, r=20),
         yaxis_title="Índice (x EBITDA)",
@@ -262,7 +262,7 @@ with tabs[4]:
         )
     ])
     fig_div_hist.update_layout(
-        template="plotly_dark",
+        
         height=400,
         margin=dict(t=20, b=20, l=40, r=20),
         yaxis_title="Montante (R$ Milhões)",
@@ -322,7 +322,7 @@ with tabs[5]:
     
     fig_val.update_layout(
         barmode='group',
-        template="plotly_dark",
+        
         height=400,
         margin=dict(t=20, b=20, l=20, r=20),
         yaxis_title="Múltiplo"
@@ -413,7 +413,7 @@ with tabs[6]:
     ])
     fig_setor_bench.update_layout(
         barmode='group',
-        template="plotly_dark",
+        
         height=450,
         margin=dict(t=20, b=40, l=40, r=20),
         yaxis_title="Percentual (%)",

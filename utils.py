@@ -36,6 +36,8 @@ def carregar_demonstrativos_cvm_real(ano):
         pass
     return pd.DataFrame()
 
+
+
 def injetar_css():
     st.markdown(
         """
@@ -54,27 +56,26 @@ def injetar_css():
                 padding-bottom: 2rem;
             }
 
-            /* Sidebar Gradient */
+            /* Sidebar adaptativo */
             section[data-testid="stSidebar"] {
-                background: linear-gradient(180deg, #0e1117 0%, #171b26 100%);
-                border-right: 1px solid rgba(255,255,255,0.05);
+                background: var(--secondary-background-color);
+                border-right: 1px solid rgba(128,128,128,0.2);
             }
 
-            /* Glassmorphism Metrics */
+            /* Metrics adaptativos */
             div[data-testid="stMetric"] {
-                background-color: rgba(26, 31, 43, 0.65);
-                border: 1px solid rgba(255,255,255,0.1);
+                background-color: var(--secondary-background-color);
+                border: 1px solid rgba(128,128,128,0.2);
                 border-radius: 12px;
                 padding: 15px 20px;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                backdrop-filter: blur(10px);
+                box-shadow: 0 4px 10px rgba(0,0,0,0.05);
                 transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
             }
 
             div[data-testid="stMetric"]:hover {
                 transform: translateY(-5px);
-                box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-                border-color: rgba(0, 210, 255, 0.5);
+                box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+                border-color: var(--primary-color);
             }
 
             div[data-testid="stMetricValue"] {
@@ -91,13 +92,14 @@ def injetar_css():
                 font-size: clamp(1.2rem, 3vw, 1.8rem) !important;
                 font-weight: 600;
                 line-height: 1.3;
-                color: #e2e8f0;
+                color: var(--text-color);
             }
 
             div[data-testid="stMetricLabel"] {
                 font-size: clamp(0.85rem, 1.5vw, 0.95rem) !important;
-                color: #a0aec0;
+                color: var(--text-color);
                 font-weight: 400;
+                opacity: 0.8;
                 white-space: normal !important;
             }
             
@@ -106,21 +108,22 @@ def injetar_css():
                 font-size: clamp(0.8rem, 1.2vw, 1rem) !important;
             }
 
-            /* Botões Modernos e Suaves */
+            /* Botões Adaptativos */
             div.stButton > button {
                 border-radius: 8px;
-                border: 1px solid rgba(255,255,255,0.1);
-                background: linear-gradient(90deg, #1e2530 0%, #293240 100%);
+                border: 1px solid rgba(128,128,128,0.2);
+                background: var(--secondary-background-color);
+                color: var(--text-color);
                 transition: all 0.3s ease;
                 font-weight: 600;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             }
 
             div.stButton > button:hover {
-                border-color: #00d2ff;
-                box-shadow: 0 0 10px rgba(0, 210, 255, 0.4);
+                border-color: var(--primary-color);
+                box-shadow: 0 0 10px rgba(128, 128, 128, 0.1);
                 transform: translateY(-2px);
-                color: #ffffff;
+                color: var(--text-color);
             }
             
             /* Tabs Style */
