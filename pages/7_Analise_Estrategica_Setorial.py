@@ -91,14 +91,107 @@ with tab1:
 
         fig.update_layout(
             barmode='group',
-            height=500,
+            height=450,
             margin=dict(t=30, b=20, l=40, r=20),
             yaxis_title="R$ (Bilhões)",
-            legend=dict(x=0.01, y=0.99, bgcolor='rgba(0,0,0,0.5)'),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        st.info("💡 **Análise de Fatores de Perda:** A maior parte do faturamento que 'vaza' do caixa corporativo ocorre na linha de **Custo dos Bens Vendidos (COGS)** (Matéria prima, insumos médicos) e **Despesas com Vendas/Marketing** (SG&A). Apesar do volume alto de saída, a margem retida historicamente garante lucro no período.")
+        st.info("💡 **Análise de Fatores de Perda:** A maior parte do faturamento que 'vaza' do caixa corporativo ocorre na linha de **Custo dos Bens Vendidos (COGS)** (Matéria prima, insumos médicos) e **Despesas com Vendas/Marketing** (SG&A).")
+        
+        st.markdown("---")
+        st.markdown("### 🔍 Detalhamento das Perdas (O 'Buraco' Operacional)")
+        st.markdown("Visão focada nos principais drenos de caixa por setor (Marketing, Corporativo e Pesquisa).")
+        
+        cogs = df_hist.get('Cost Of Revenue', pd.Series([0]*len(anos), index=df_hist.index)).fillna(0) / 1e9
+        vendas = df_hist.get('Selling And Marketing Expense', pd.Series([0]*len(anos), index=df_hist.index)).fillna(0) / 1e9
+        admin = df_hist.get('General And Administrative Expense', pd.Series([0]*len(anos), index=df_hist.index)).fillna(0) / 1e9
+        ped = df_hist.get('Research And Development', pd.Series([0]*len(anos), index=df_hist.index)).fillna(0) / 1e9
+        
+        despesas_conhecidas = cogs + vendas + admin + ped
+        outras_despesas = custos_totais - despesas_conhecidas
+        outras_despesas = outras_despesas.apply(lambda x: max(x, 0)) # Evita valores residuais negativos
+        
+        fig_detalhe = go.Figure()
+        
+        fig_detalhe.add_trace(go.Bar(
+            x=anos, y=cogs, name="Matéria-Prima / Fábrica (COGS)", marker_color='#8B0000',
+            text=[f"R$ {v:.2f} Bi" if v > 0.1 else "" for v in cogs], textposition='auto'
+        ))
+        
+        fig_detalhe.add_trace(go.Bar(
+            x=anos, y=vendas, name="Vendas e Marketing", marker_color='#FF8C00',
+            text=[f"R$ {v:.2f} Bi" if v > 0.1 else "" for v in vendas], textposition='auto'
+        ))
+
+        fig_detalhe.add_trace(go.Bar(
+            x=anos, y=admin, name="Admin (RH/Backoffice)", marker_color='#FFD700',
+            text=[f"R$ {v:.2f} Bi" if v > 0.05 else "" for v in admin], textposition='auto'
+        ))
+
+        fig_detalhe.add_trace(go.Bar(
+            x=anos, y=ped, name="Pesquisa e Desenv. (P&D)", marker_color='#32CD32',
+            text=[f"R$ {v:.2f} Bi" if v > 0.05 else "" for v in ped], textposition='auto'
+        ))
+
+        fig_detalhe.add_trace(go.Bar(
+            x=anos, y=outras_despesas, name="Outros / Impostos", marker_color='#A9A9A9',
+            text=[f"R$ {v:.2f} Bi" if v > 0.1 else "" for v in outras_despesas], textposition='inside'
+        ))
+        fig_detalhe.update_layout(
+            barmode='stack',
+            height=450,
+            margin=dict(t=30, b=20, l=40, r=20),
+            yaxis_title="R$ (Bilhões)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+        )
+        st.plotly_chart(fig_detalhe, use_container_width=True)
+        
+        st.markdown("---")
+        st.markdown("### 💱 Análise de Risco Real: Impacto Cambial nas Matérias-Primas")
+        st.markdown("Como não há abertura pública sobre os insumos específicos, a melhor proxy real para avaliar a pressão sobre a **Matéria-Prima (COGS)** é cruzar os gastos com a **Cotação Histórica do Dólar**. A maior parte dos insumos farmacêuticos (APIs) no Brasil é importada.")
+        
+        try:
+            # Busca o histórico do Dólar via Yahoo Finance
+            dolar = yf.Ticker("BRL=X")
+            hist_dolar = dolar.history(period="5y")
+            if not hist_dolar.empty:
+                hist_dolar['Ano'] = hist_dolar.index.year
+                dolar_anual = hist_dolar.groupby('Ano')['Close'].mean()
+                
+                # Sincroniza os anos do gráfico de COGS com os anos do Dólar
+                anos_int = [int(a) for a in anos]
+                dolar_filtrado = [dolar_anual.get(a, 0) for a in anos_int]
+                
+                fig_dolar = make_subplots(specs=[[{"secondary_y": True}]])
+                
+                # Barra de COGS
+                fig_dolar.add_trace(go.Bar(
+                    x=anos, y=cogs, name="Custo de Matéria-Prima (R$ Bi)", marker_color='#8B0000'
+                ), secondary_y=False)
+                
+                # Linha do Dólar
+                fig_dolar.add_trace(go.Scatter(
+                    x=anos, y=dolar_filtrado, name="Cotação Média Dólar (R$)", 
+                    line=dict(color='#00d2ff', width=3), mode='lines+markers+text',
+                    text=[f"R$ {v:.2f}" if v > 0 else "" for v in dolar_filtrado], textposition='top center'
+                ), secondary_y=True)
+                
+                fig_dolar.update_layout(
+                    height=400,
+                    margin=dict(t=20, b=20, l=40, r=40),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+                )
+                fig_dolar.update_yaxes(title_text="Custo COGS (R$ Bilhões)", secondary_y=False)
+                fig_dolar.update_yaxes(title_text="Dólar Médio Anual (R$)", secondary_y=True, showgrid=False)
+                
+                st.plotly_chart(fig_dolar, use_container_width=True)
+                
+                st.info("💡 **Inteligência:** Este cruzamento demonstra a correlação real entre as altas do Dólar e a compressão das margens (aumento da barra vermelha de COGS), refletindo o repasse cambial na importação de insumos sem depender de dados internos sigilosos.")
+        except Exception as e:
+            st.warning("Não foi possível carregar a cotação histórica do Dólar no momento.")
+
     else:
         st.warning("Não foi possível carregar o histórico financeiro da B3 no momento.")
 

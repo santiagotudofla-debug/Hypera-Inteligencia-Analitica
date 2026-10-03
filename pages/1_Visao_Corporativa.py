@@ -5,7 +5,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
-from utils import carregar_dados_mercado_real, carregar_demonstrativos_cvm_real
+from utils import carregar_dados_mercado_real, carregar_demonstrativos_cvm_real, carregar_indicadores_macro, carregar_cotacao_dolar
 
 df_mercado_real = carregar_dados_mercado_real()
 ano_atual = datetime.now().year
@@ -70,6 +70,19 @@ with tabs[1]:
     st.title("📈 Módulo de Mercado & Cotações Reais — HYPE3 (B3)")
     st.markdown("Dados de preços de fechamento e volume obtidos em tempo real via Yahoo Finance / B3.")
     
+    st.subheader("🌐 Câmbio & Cenário Macroeconômico")
+    col_m1, col_m2, col_m3 = st.columns(3)
+    macro_dados = carregar_indicadores_macro()
+    dolar_dados = carregar_cotacao_dolar()
+    
+    with col_m1:
+        st.metric("Dólar (USD/BRL)", f"R$ {dolar_dados['Cotacao']:.4f}", f"{dolar_dados['Variacao']:.2f}%" if dolar_dados['Cotacao'] > 0 else "")
+    with col_m2:
+        st.metric("Taxa Selic (BCB)", macro_dados['Selic'])
+    with col_m3:
+        st.metric("IPCA Mensal (BCB)", macro_dados['IPCA'])
+    st.markdown("---")
+    
     if not df_mercado_real.empty:
         cotacao_atual = df_mercado_real['Close'].iloc[-1]
         cotacao_anterior = df_mercado_real['Close'].iloc[-2]
@@ -132,9 +145,9 @@ with tabs[3]:
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric(label="Categoria Principal (Receita)", value="Medicamentos Isentos de Prescrição", delta="Líder de Mercado")
+        st.metric(label="Principal Fonte de Receita", value="MIPs (Sem Receita)", delta="Líder de Mercado")
     with col2:
-        st.metric(label="Pico de Sazonalidade", value="Outono / Inverno (Q2-Q3)", delta="Gripe e Imunidade")
+        st.metric(label="Pico de Sazonalidade", value="Inverno (Q2-Q3)", delta="Gripe e Imunidade")
     with col3:
         st.metric(label="Taxa de Renovação de Portfólio", value="14.5%", delta="+2.0% a.a.")
         

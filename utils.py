@@ -36,6 +36,49 @@ def carregar_demonstrativos_cvm_real(ano):
         pass
     return pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def carregar_indicadores_macro():
+    """Busca Selic e IPCA via API do Banco Central (SGS)."""
+    macro = {"Selic": "N/D", "IPCA": "N/D"}
+    try:
+        # Selic
+        r_selic = requests.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json', timeout=5)
+        if r_selic.status_code == 200:
+            macro["Selic"] = f"{r_selic.json()[0]['valor']}%"
+        # IPCA (Mensal)
+        r_ipca = requests.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json', timeout=5)
+        if r_ipca.status_code == 200:
+            macro["IPCA"] = f"{r_ipca.json()[0]['valor']}%"
+    except:
+        pass
+    return macro
+
+@st.cache_data(ttl=900)
+def carregar_cotacao_dolar():
+    """Busca cotação do Dólar via AwesomeAPI."""
+    try:
+        r = requests.get('https://economia.awesomeapi.com.br/last/USD-BRL', timeout=5)
+        if r.status_code == 200:
+            data = r.json()['USDBRL']
+            return {"Cotacao": float(data['bid']), "Variacao": float(data['pctChange'])}
+    except:
+        pass
+    return {"Cotacao": 0.0, "Variacao": 0.0}
+
+@st.cache_data(ttl=1800)
+def carregar_noticias_yfinance(ticker="HYPE3.SA"):
+    """Busca as últimas notícias usando a API do Yahoo Finance."""
+    try:
+        ativo = yf.Ticker(ticker)
+        noticias = ativo.news
+        if noticias:
+            return noticias[:5] # Retorna as 5 mais recentes
+    except:
+        pass
+    return []
+
+
+
 
 
 def injetar_css():

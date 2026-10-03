@@ -5,7 +5,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
-from utils import carregar_dados_mercado_real, carregar_demonstrativos_cvm_real
+from utils import carregar_dados_mercado_real, carregar_demonstrativos_cvm_real, carregar_noticias_yfinance
 
 df_mercado_real = carregar_dados_mercado_real()
 ano_atual = datetime.now().year
@@ -13,7 +13,7 @@ df_cvm_real = carregar_demonstrativos_cvm_real(ano_atual)
 if df_cvm_real.empty:
     df_cvm_real = carregar_demonstrativos_cvm_real(ano_atual - 1)
 
-tabs = st.tabs(["Alertas", "Anomalias", "Forecast"])
+tabs = st.tabs(["Alertas", "Anomalias", "Forecast", "Notícias (Ao Vivo)"])
 
 with tabs[0]:
     st.title("🚨 Central de Alertas & Monitoramento de Riscos — HYPE3")
@@ -238,3 +238,19 @@ with tabs[2]:
     st.info("💡 Nota Analítica: As projeções utilizam tendências históricas de crescimento orgânico reportadas nas demonstrações padronizadas da CVM.")
     
 
+with tabs[3]:
+    st.title("📰 Notícias Financeiras & Radar de Mercado — HYPE3")
+    st.markdown("Feed de notícias recentes impactando o mercado e setor da Hypera Pharma, via Yahoo Finance.")
+    
+    noticias = carregar_noticias_yfinance("HYPE3.SA")
+    
+    if noticias:
+        for idx, noticia in enumerate(noticias):
+            st.subheader(noticia.get("title", f"Notícia {idx+1}"))
+            dt = datetime.fromtimestamp(noticia.get('providerPublishTime', 0))
+            st.caption(f"Publicado por: **{noticia.get('publisher', 'Desconhecido')}** em {dt.strftime('%d/%m/%Y %H:%M')}")
+            if noticia.get('link'):
+                st.markdown(f"[🔗 Ler notícia completa]({noticia['link']})")
+            st.markdown("---")
+    else:
+        st.warning("Não há notícias recentes disponíveis ou erro na comunicação com a API de notícias no momento.")
