@@ -447,7 +447,6 @@ def carregar_noticias_yfinance(ticker="HYPE3.SA"):
 
 
 
-
 def injetar_css():
     st.markdown(
         """
