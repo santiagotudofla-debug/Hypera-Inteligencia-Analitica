@@ -40,32 +40,30 @@ def consultar_gemini(query, contexto_texto, key):
         "Responda em português de forma analítica, profissional, precisa e direta."
     )
     
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model='gemini-3.6-flash',
-                contents=f"Contexto Oficial HYPE3:\n{contexto_texto}\n\nPergunta do Usuário:\n{query}",
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.2,
-                ),
-            )
-            return True, response.text
-        except Exception as e:
-            error_msg = str(e)
-            if "503" in error_msg and attempt < max_retries - 1:
-                time.sleep(2)
-                continue
-            elif "429" in error_msg and attempt < max_retries - 1:
-                time.sleep(10)
-                continue
-            elif "429" in error_msg:
-                return False, "⚠️ Limite de consultas gratuitas atingido temporariamente. Por favor, aguarde 1 minuto."
-            else:
-                return False, f"Ocorreu um erro ao consultar a API: {e}"
+    modelos_candidatos = ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-flash-latest']
+    ultimo_erro = ""
+    for modelo in modelos_candidatos:
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=modelo,
+                    contents=f"Contexto Oficial HYPE3:\n{contexto_texto}\n\nPergunta do Usuário:\n{query}",
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.2,
+                    ),
+                )
+                return True, response.text
+            except Exception as e:
+                ultimo_erro = str(e)
+                if "503" in ultimo_erro:
+                    time.sleep(1)
+                    continue
+                elif "429" in ultimo_erro:
+                    return False, "⚠️ Limite de consultas gratuitas atingido temporariamente. Por favor, aguarde 1 minuto."
+                break
     
-    return False, "A API do Gemini está com alta demanda no momento. Por favor, tente novamente em alguns instantes."
+    return False, f"A API do Gemini está com alta demanda no momento ({ultimo_erro}). Por favor, tente novamente."
 
 # Botões de sugestão
 st.markdown("### 💡 Perguntas Sugeridas (Clique para testar)")

@@ -397,14 +397,51 @@ def carregar_cotacao_dolar():
 
 @st.cache_data(ttl=1800)
 def carregar_noticias_yfinance(ticker="HYPE3.SA"):
-    """Busca as últimas notícias usando a API do Yahoo Finance."""
+    """Busca as últimas notícias do ticker via Yahoo Finance ou fallback ao vivo via Google News RSS Brasil."""
     try:
         ativo = yf.Ticker(ticker)
         noticias = ativo.news
-        if noticias:
-            return noticias[:5] # Retorna as 5 mais recentes
-    except:
+        if noticias and len(noticias) > 0:
+            return noticias[:5]
+    except Exception:
         pass
+        
+    # Fallback em tempo real para notícias financeiras brasileiras (RSS Google News)
+    try:
+        termo = "Hypera+Pharma+OR+HYPE3" if "HYPE" in ticker.upper() else ticker
+        url_rss = f"https://news.google.com/rss/search?q={termo}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+        resp = requests.get(url_rss, timeout=6)
+        if resp.status_code == 200:
+            import xml.etree.ElementTree as ET
+            from email.utils import parsedate_to_datetime
+            root = ET.fromstring(resp.content)
+            items = root.findall('.//item')
+            noticias_rss = []
+            for item in items[:6]:
+                full_title = item.find('title').text if item.find('title') is not None else ''
+                parts = full_title.rsplit(' - ', 1)
+                title = parts[0]
+                publisher = parts[1] if len(parts) > 1 else 'Imprensa Financeira'
+                link = item.find('link').text if item.find('link') is not None else ''
+                pub_date_str = item.find('pubDate').text if item.find('pubDate') is not None else ''
+                ts = 0
+                if pub_date_str:
+                    try:
+                        ts = int(parsedate_to_datetime(pub_date_str).timestamp())
+                    except Exception:
+                        pass
+                if title:
+                    noticias_rss.append({
+                        'title': title,
+                        'publisher': publisher,
+                        'providerPublishTime': ts,
+                        'link': link
+                    })
+            if noticias_rss:
+                return noticias_rss
+    except Exception:
+        pass
+        
     return []
 
 
