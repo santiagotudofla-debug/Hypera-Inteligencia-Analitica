@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from utils import carregar_dolar_historico
 
 st.title("♟️ Análise Estratégica Setorial (2023-2026)")
 st.markdown("Comparativo histórico de perdas, ganhos e benchmarking competitivo contra as gigantes de saúde da B3.")
@@ -153,9 +154,8 @@ with tab1:
         st.markdown("Como não há abertura pública sobre os insumos específicos, a melhor proxy real para avaliar a pressão sobre a **Matéria-Prima (COGS)** é cruzar os gastos com a **Cotação Histórica do Dólar**. A maior parte dos insumos farmacêuticos (APIs) no Brasil é importada.")
         
         try:
-            # Busca o histórico do Dólar via Yahoo Finance
-            dolar = yf.Ticker("BRL=X")
-            hist_dolar = dolar.history(period="5y")
+            # Busca o histórico do Dólar via cache seguro do utils
+            hist_dolar = carregar_dolar_historico()
             if not hist_dolar.empty:
                 hist_dolar['Ano'] = hist_dolar.index.year
                 dolar_anual = hist_dolar.groupby('Ano')['Close'].mean()
