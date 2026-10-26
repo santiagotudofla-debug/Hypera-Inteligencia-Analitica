@@ -3,18 +3,21 @@ import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from utils import carregar_dolar_historico
+from utils import (
+    carregar_dolar_historico,
+    carregar_financials_ticker,
+    carregar_info_ticker
+)
 
 st.title("♟️ Análise Estratégica Setorial (2023-2026)")
 st.markdown("Comparativo histórico de perdas, ganhos e benchmarking competitivo contra as gigantes de saúde da B3.")
 
 @st.cache_data(ttl=3600)
 def carregar_dados_historicos(ticker="HYPE3.SA"):
-    ativo = yf.Ticker(ticker)
-    fin = ativo.financials.T
-    if not fin.empty:
+    fin_df = carregar_financials_ticker(ticker)
+    if not fin_df.empty:
         # Pega os últimos 4 anos reportados e ordena do mais antigo pro mais novo
-        fin = fin.sort_index().tail(4)
+        fin = fin_df.T.sort_index().tail(4)
         return fin
     return pd.DataFrame()
 
@@ -30,17 +33,17 @@ def carregar_benchmarking():
     dados_setor = []
     for ticker, nome in concorrentes.items():
         try:
-            info = yf.Ticker(ticker).info
-            rec = info.get('totalRevenue', 0) / 1e9
-            ml = info.get('profitMargins', 0) * 100
-            ebitda = info.get('ebitdaMargins', 0) * 100
+            info = carregar_info_ticker(ticker)
+            rec = float(info.get('totalRevenue', 0.0) or 0.0) / 1e9
+            ml = float(info.get('profitMargins', 0.0) or 0.0) * 100
+            ebitda = float(info.get('ebitdaMargins', 0.0) or 0.0) * 100
             dados_setor.append({
                 "Empresa": nome,
                 "Receita Total (Bi)": rec,
                 "Margem Líquida (%)": ml,
                 "Margem EBITDA (%)": ebitda
             })
-        except:
+        except Exception:
             pass
     return pd.DataFrame(dados_setor)
 
