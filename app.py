@@ -1,4 +1,7 @@
 import streamlit as st
+import importlib
+import utils
+importlib.reload(utils)
 from utils import injetar_css
 
 st.set_page_config(
