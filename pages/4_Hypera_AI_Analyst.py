@@ -1,13 +1,9 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-from datetime import datetime
 import time
 from utils import (
-    carregar_dados_mercado_real,
-    carregar_demonstrativos_cvm_real,
     carregar_info_ticker,
-    calcular_altman_z_score
+    calcular_altman_z_score,
+    obter_dy_real
 )
 
 try:
@@ -99,7 +95,7 @@ if query_ativa:
             info_ai = carregar_info_ticker("HYPE3.SA")
             z_info = calcular_altman_z_score(info_ai)
             
-            dy_ai = float(info_ai.get('dividendYield', 0.0) or 0.0) * 100
+            dy_ai = obter_dy_real(info_ai)
             ml_ai = float(info_ai.get('profitMargins', 0.0) or 0.0) * 100
             me_ai = float(info_ai.get('ebitdaMargins', 0.0) or 0.0) * 100
             roe_ai = float(info_ai.get('returnOnEquity', 0.0) or 0.0) * 100

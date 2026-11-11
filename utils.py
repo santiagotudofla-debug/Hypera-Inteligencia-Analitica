@@ -116,11 +116,22 @@ def carregar_balance_sheet_ticker(ticker="HYPE3.SA"):
 
 @st.cache_data(ttl=1800)
 def carregar_cashflow_ticker(ticker="HYPE3.SA"):
-    """Busca a Demonstração de Fluxo de Caixa (cashflow) via Yahoo Finance com cache."""
+    """Busca a Demonstração de Fluxo de Caixa (cashflow) anual via Yahoo Finance com cache."""
     try:
         cf = yf.Ticker(ticker).cashflow
         if not cf.empty:
             return cf
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+@st.cache_data(ttl=1800)
+def carregar_quarterly_cashflow_ticker(ticker="HYPE3.SA"):
+    """Busca a Demonstração de Fluxo de Caixa (quarterly_cashflow) trimestral mais recente via Yahoo Finance com cache."""
+    try:
+        qcf = yf.Ticker(ticker).quarterly_cashflow
+        if not qcf.empty:
+            return qcf
     except Exception:
         pass
     return pd.DataFrame()
@@ -200,18 +211,19 @@ def carregar_benchmarking_setorial():
     """Busca e consolida indicadores de mercado dos principais concorrentes de saúde/farma na B3."""
     tickers = {
         "Hypera Pharma (HYPE3)": "HYPE3.SA",
+        "RaiaDrogasil (RADL3)": "RADL3.SA",
+        "Fleury (FLRY3)": "FLRY3.SA",
         "Blau Farmacêutica (BLAU3)": "BLAU3.SA",
-        "Pague Menos (PGMN3)": "PGMN3.SA",
-        "RaiaDrogasil (RADL3)": "RADL3.SA"
+        "Pague Menos (PGMN3)": "PGMN3.SA"
     }
     
     dados_setor = []
     for nome, ticker in tickers.items():
         try:
-            info = yf.Ticker(ticker).info
+            info = carregar_info_ticker(ticker)
             ml = info.get("profitMargins", 0) * 100 if info.get("profitMargins") else 0.0
             roe = info.get("returnOnEquity", 0) * 100 if info.get("returnOnEquity") else 0.0
-            ebit = info.get("ebitda", 0) * 0.8
+            ebit = (info.get("ebitda", 0) or 0) * 0.8
             nopat = ebit * 0.66
             div = info.get("totalDebt", 0) or 0
             cx = info.get("totalCash", 0) or 0
@@ -251,6 +263,103 @@ def carregar_benchmarking_setorial():
     df_setor = pd.DataFrame(dados_setor)
     return df_setor
 
+def obter_dy_real(info):
+    """Retorna o Dividend Yield em percentual (%) corrigindo a escala retornada pelo Yahoo Finance."""
+    if not info or not isinstance(info, dict):
+        return 4.75
+    raw_dy = info.get("dividendYield")
+    if raw_dy is not None and pd.notna(raw_dy) and float(raw_dy) > 0:
+        val = float(raw_dy)
+        # Se o provedor já retornar em base percentual (ex: 4.75 em vez de 0.0475), mantém a escala
+        return round(val if val > 1.0 else val * 100.0, 2)
+    rate = float(info.get("dividendRate", 0.0) or 0.0)
+    price = float(info.get("currentPrice", info.get("regularMarketPrice", 0.0)) or 0.0)
+    if rate > 0 and price > 0:
+        return round((rate / price) * 100.0, 2)
+    return 4.75
+
+@st.cache_data(ttl=1800)
+def calcular_multiplos_historicos_real(ticker="HYPE3.SA"):
+    """Calcula em tempo real os múltiplos atuais e as bandas históricas (Média, Mínimo e Máximo) dos últimos exercícios."""
+    info = carregar_info_ticker(ticker)
+    bs = carregar_balance_sheet_ticker(ticker)
+    fin = carregar_financials_ticker(ticker)
+    divs = carregar_dividends_ticker(ticker)
+    hist_mkt = carregar_dados_mercado_real(ticker, "5y")
+    
+    pl_atual = round(float(info.get("trailingPE", 0.0) or 0.0), 2)
+    pvp_atual = round(float(info.get("priceToBook", 0.0) or 0.0), 2)
+    ev_ebitda_atual = round(float(info.get("enterpriseToEbitda", 0.0) or 0.0), 2)
+    dy_atual = obter_dy_real(info)
+    
+    shares = float(info.get("sharesOutstanding", 633000000) or 633000000)
+    
+    pls, pvps, evs, dys = [], [], [], []
+    if pl_atual > 0: pls.append(pl_atual)
+    if pvp_atual > 0: pvps.append(pvp_atual)
+    if ev_ebitda_atual > 0: evs.append(ev_ebitda_atual)
+    if dy_atual > 0: dys.append(dy_atual)
+    
+    preco_por_ano = {}
+    if not hist_mkt.empty and 'Date' in hist_mkt.columns:
+        df_p = hist_mkt.copy()
+        df_p['Ano'] = pd.to_datetime(df_p['Date']).dt.year
+        preco_por_ano = df_p.groupby('Ano')['Close'].mean().to_dict()
+        
+    div_por_ano = {}
+    if not divs.empty:
+        s_div = divs.copy()
+        s_div.index = s_div.index.tz_localize(None)
+        div_por_ano = s_div.groupby(s_div.index.year).sum().to_dict()
+        
+    for ano, p_med in preco_por_ano.items():
+        if p_med > 0 and ano in div_por_ano and div_por_ano[ano] > 0:
+            dys.append(round((float(div_por_ano[ano]) / float(p_med)) * 100.0, 2))
+            
+    if not bs.empty and not fin.empty:
+        common_cols = [c for c in bs.columns if c in fin.columns]
+        for col in common_cols:
+            ano = col.year if hasattr(col, 'year') else int(str(col)[:4])
+            p_ano = float(preco_por_ano.get(ano, info.get("currentPrice", 22.0) or 22.0))
+            mkt_cap_ano = p_ano * shares
+            
+            ni = float(fin.loc['Net Income', col]) if 'Net Income' in fin.index and pd.notna(fin.loc['Net Income', col]) else None
+            eq = float(bs.loc['Stockholders Equity', col]) if 'Stockholders Equity' in bs.index and pd.notna(bs.loc['Stockholders Equity', col]) else None
+            div = float(bs.loc['Total Debt', col]) if 'Total Debt' in bs.index and pd.notna(bs.loc['Total Debt', col]) else 0.0
+            cx = float(bs.loc['Cash And Cash Equivalents', col]) if 'Cash And Cash Equivalents' in bs.index and pd.notna(bs.loc['Cash And Cash Equivalents', col]) else 0.0
+            ebitda = float(fin.loc['EBITDA', col]) if 'EBITDA' in fin.index and pd.notna(fin.loc['EBITDA', col]) else None
+            
+            if ni and ni > 0:
+                pl_h = mkt_cap_ano / ni
+                if 3.0 < pl_h < 60.0:
+                    pls.append(round(pl_h, 2))
+            if eq and eq > 0:
+                pvp_h = mkt_cap_ano / eq
+                if 0.5 < pvp_h < 15.0:
+                    pvps.append(round(pvp_h, 2))
+            if ebitda and ebitda > 0:
+                ev_h = (mkt_cap_ano + div - cx) / ebitda
+                if 2.0 < ev_h < 40.0:
+                    evs.append(round(ev_h, 2))
+                    
+    def _stats(arr, fallback_atual):
+        if not arr:
+            return fallback_atual, fallback_atual, fallback_atual, fallback_atual
+        return round(arr[0], 2), round(float(pd.Series(arr).mean()), 2), round(float(min(arr)), 2), round(float(max(arr)), 2)
+
+    pl_a, pl_med, pl_min, pl_max = _stats(pls, pl_atual or 10.5)
+    pvp_a, pvp_med, pvp_min, pvp_max = _stats(pvps, pvp_atual or 1.2)
+    ev_a, ev_med, ev_min, ev_max = _stats(evs, ev_ebitda_atual or 7.5)
+    dy_a, dy_med, dy_min, dy_max = _stats(dys, dy_atual or 4.75)
+
+    return pd.DataFrame({
+        "Múltiplo": ["P/L", "P/VP", "EV/EBITDA", "Dividend Yield (%)"],
+        "Atual (B3)": [pl_a, pvp_a, ev_a, dy_a],
+        "Média Histórica": [pl_med, pvp_med, ev_med, dy_med],
+        "Mínimo (5A)": [pl_min, pvp_min, ev_min, dy_min],
+        "Máximo (5A)": [pl_max, pvp_max, ev_max, dy_max]
+    })
+
 def calcular_altman_z_score(info=None, bs=None, fin=None):
     """
     Calcula o Altman Z-Score real para mercados emergentes (Altman Z'' Model):
@@ -268,14 +377,31 @@ def calcular_altman_z_score(info=None, bs=None, fin=None):
     if info is None or not info:
         info = carregar_info_ticker("HYPE3.SA")
         
+    def _first_valid(df, row_names):
+        if df is not None and not df.empty:
+            for r in row_names:
+                if r in df.index:
+                    s = df.loc[r].dropna()
+                    if not s.empty:
+                        return float(s.iloc[0])
+        return None
+
     try:
-        ta = float(bs.loc['Total Assets'].iloc[0]) if 'Total Assets' in bs.index else 0.0
-        wc = float(bs.loc['Working Capital'].iloc[0]) if 'Working Capital' in bs.index else 0.0
-        tl = float(bs.loc['Total Liabilities Net Minority Interest'].iloc[0]) if 'Total Liabilities Net Minority Interest' in bs.index else (ta - float(bs.loc['Stockholders Equity'].iloc[0]) if 'Stockholders Equity' in bs.index else 0.0)
-        eq = float(bs.loc['Stockholders Equity'].iloc[0]) if 'Stockholders Equity' in bs.index else float(info.get('marketCap', 0.0))
+        ta = _first_valid(bs, ['Total Assets']) or 0.0
+        wc = _first_valid(bs, ['Working Capital'])
+        if wc is None:
+            ca = _first_valid(bs, ['Current Assets'])
+            cl = _first_valid(bs, ['Current Liabilities'])
+            wc = (ca - cl) if (ca is not None and cl is not None) else 0.0
+            
+        eq = _first_valid(bs, ['Stockholders Equity', 'Total Equity Gross Minority Interest']) or float(info.get('marketCap', 0.0) or 0.0)
+        tl = _first_valid(bs, ['Total Liabilities Net Minority Interest'])
+        if tl is None and ta > 0 and eq > 0:
+            tl = ta - eq
+        tl = tl or 0.0
         
-        ebit = float(fin.loc['EBIT'].iloc[0]) if 'EBIT' in fin.index else (float(fin.loc['Operating Income'].iloc[0]) if 'Operating Income' in fin.index else float(info.get('ebitda', 0.0)))
-        ni = float(fin.loc['Net Income'].iloc[0]) if 'Net Income' in fin.index else float(info.get('netIncomeToCommon', 0.0))
+        ebit = _first_valid(fin, ['EBIT', 'Operating Income']) or float(info.get('ebitda', 0.0) or 0.0) * 0.82
+        ni = _first_valid(fin, ['Net Income', 'Net Income Common Stockholders']) or float(info.get('netIncomeToCommon', 0.0) or 0.0)
         
         if ta > 0 and tl > 0:
             x1 = wc / ta
@@ -284,7 +410,8 @@ def calcular_altman_z_score(info=None, bs=None, fin=None):
             x4 = eq / tl
             z_score = round(6.56 * x1 + 3.26 * x2 + 6.72 * x3 + 1.05 * x4, 2)
         else:
-            z_score = 2.22 # Fallback empírico real Hypera
+            z_score = 2.22 # Fallback empírico caso provedor esteja offline
+            x1, x2, x3, x4 = 0.077, 0.048, 0.077, 0.991
             
         if z_score > 2.60:
             zona = "Zona Segura de Liquidez"
@@ -300,10 +427,10 @@ def calcular_altman_z_score(info=None, bs=None, fin=None):
             "z_score": z_score,
             "zona": zona,
             "status": status,
-            "x1": round(x1, 3) if ta > 0 else 0.077,
-            "x2": round(x2, 3) if ta > 0 else 0.048,
-            "x3": round(x3, 3) if ta > 0 else 0.077,
-            "x4": round(x4, 3) if tl > 0 else 0.991
+            "x1": round(x1, 3),
+            "x2": round(x2, 3),
+            "x3": round(x3, 3),
+            "x4": round(x4, 3)
         }
     except Exception:
         return {
@@ -368,27 +495,31 @@ def calcular_score_saude(info=None, z_score_val=None):
 
 @st.cache_data(ttl=3600)
 def carregar_indicadores_macro():
-    """Busca Selic (SGS 1178) e IPCA (SGS 433) via API do Banco Central com tratamento isolado e alta performance."""
-    macro = {"Selic": "13.65%", "IPCA": "0.82%"}
+    """Busca Selic e IPCA em tempo real via BrasilAPI (Banco Central / Copom) e API SGS do BCB."""
+    macro = {"Selic": "13.75%", "IPCA": "0.44%"}
     headers = {"User-Agent": "Mozilla/5.0"}
     
-    # 1. Selic Meta Anualizada (Série 1178 - ultra rápida)
+    # 1. Consulta primária ultra-rápida via BrasilAPI (Taxas Oficiais BCB)
     try:
-        r_selic = requests.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados/ultimos/1?formato=json', headers=headers, timeout=4)
-        if r_selic.status_code == 200:
-            dados = r_selic.json()
-            if dados and len(dados) > 0 and 'valor' in dados[0]:
-                macro["Selic"] = str(dados[0]['valor']) + "%"
+        r_br = requests.get('https://brasilapi.com.br/api/taxas/v1', headers=headers, timeout=5)
+        if r_br.status_code == 200:
+            for item in r_br.json():
+                nome = str(item.get('nome', '')).upper()
+                val = item.get('valor')
+                if nome == 'SELIC' and val is not None:
+                    macro["Selic"] = f"{float(val):.2f}%"
+                elif nome == 'IPCA' and val is not None:
+                    macro["IPCA"] = f"{float(val):.2f}% (12m)"
     except Exception:
         pass
         
-    # 2. IPCA Mensal (Série 433)
+    # 2. IPCA Mensal mais recente via BCB SGS (Série 433)
     try:
         r_ipca = requests.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json', headers=headers, timeout=4)
         if r_ipca.status_code == 200:
             dados = r_ipca.json()
             if dados and len(dados) > 0 and 'valor' in dados[0]:
-                macro["IPCA"] = str(dados[0]['valor']) + "%"
+                macro["IPCA"] = f"{dados[0]['valor']}% (mês)"
     except Exception:
         pass
         
@@ -405,58 +536,6 @@ def carregar_cotacao_dolar():
     except:
         pass
     return {"Cotacao": 0.0, "Variacao": 0.0}
-
-@st.cache_data(ttl=1800)
-def carregar_noticias_yfinance(ticker="HYPE3.SA"):
-    """Busca as últimas notícias do ticker via Yahoo Finance ou fallback ao vivo via Google News RSS Brasil."""
-    try:
-        ativo = yf.Ticker(ticker)
-        noticias = ativo.news
-        if noticias and len(noticias) > 0:
-            return noticias[:5]
-    except Exception:
-        pass
-        
-    # Fallback em tempo real para notícias financeiras brasileiras (RSS Google News)
-    try:
-        termo = "Hypera+Pharma+OR+HYPE3" if "HYPE" in ticker.upper() else ticker
-        url_rss = f"https://news.google.com/rss/search?q={termo}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
-        resp = requests.get(url_rss, timeout=6)
-        if resp.status_code == 200:
-            import xml.etree.ElementTree as ET
-            from email.utils import parsedate_to_datetime
-            root = ET.fromstring(resp.content)
-            items = root.findall('.//item')
-            noticias_rss = []
-            for item in items[:6]:
-                full_title = item.find('title').text if item.find('title') is not None else ''
-                parts = full_title.rsplit(' - ', 1)
-                title = parts[0]
-                publisher = parts[1] if len(parts) > 1 else 'Imprensa Financeira'
-                link = item.find('link').text if item.find('link') is not None else ''
-                pub_date_str = item.find('pubDate').text if item.find('pubDate') is not None else ''
-                ts = 0
-                if pub_date_str:
-                    try:
-                        ts = int(parsedate_to_datetime(pub_date_str).timestamp())
-                    except Exception:
-                        pass
-                if title:
-                    noticias_rss.append({
-                        'title': title,
-                        'publisher': publisher,
-                        'providerPublishTime': ts,
-                        'link': link
-                    })
-            if noticias_rss:
-                return noticias_rss
-    except Exception:
-        pass
-        
-    return []
-
-
-
 
 
 def injetar_css():

@@ -1,39 +1,34 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import datetime
 from utils import (
     carregar_dados_mercado_real,
-    carregar_demonstrativos_cvm_real,
     carregar_indicadores_macro,
     carregar_cotacao_dolar,
     carregar_info_ticker,
     carregar_financials_ticker,
     carregar_quarterly_financials_ticker,
-    obter_dre_cvm_estruturado,
     calcular_score_saude,
     calcular_altman_z_score
 )
 
 df_mercado_real = carregar_dados_mercado_real()
-ano_atual = datetime.now().year
-df_cvm_real = carregar_demonstrativos_cvm_real(ano_atual)
-if df_cvm_real.empty:
-    df_cvm_real = carregar_demonstrativos_cvm_real(ano_atual - 1)
-
-df_cvm_estruturado = obter_dre_cvm_estruturado(df_cvm_real)
 info_hype = carregar_info_ticker("HYPE3.SA")
-score_saude = calcular_score_saude(info_hype)
 z_dict = calcular_altman_z_score(info_hype)
+score_saude = calcular_score_saude(info_hype, z_dict["z_score"])
 
-tabs = st.tabs(["Visao Geral", "Mercado", "Analise Tecnica", "Portfolio e Sazonalidade", "Sustentabilidade & ODS"])
+tabs = st.tabs([
+    "🏢 Visão Geral",
+    "📈 Mercado & Análise Técnica",
+    "💊 Portfólio & Sazonalidade",
+    "🌱 Sustentabilidade & ODS"
+])
 
 with tabs[0]:
-    st.title("📊 Painel Analítico CVM — Visão Geral (HYPE3)")
-    st.markdown("Dados consolidados extraídos diretamente das demonstrações financeiras oficiais da CVM.")
+    st.title("📊 Painel Corporativo — Visão Geral (HYPE3)")
+    st.markdown("Síntese institucional, governança e diagnóstico consolidado de solvência da Hypera Pharma.")
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -43,7 +38,7 @@ with tabs[0]:
     with col3:
         st.metric(label="Governança", value="Novo Mercado", delta="100% Tag Along")
     with col4:
-        st.metric(label="Auditoria", value="Independente", delta="Regular CVM")
+        st.metric(label="Parque Industrial", value="Anápolis (GO)", delta="Maior da América Latina")
         
     st.markdown("---")
     col_g1, col_g2 = st.columns([1, 1])
@@ -74,88 +69,101 @@ with tabs[0]:
         st.caption(f"Status Calculado: **{z_dict['status']}** ({z_dict['zona']}) com base em margens e estrutura de capital.")
         
     with col_g2:
-        st.subheader("📋 Status de Carga dos Dados CVM (Online)")
-        if not df_cvm_estruturado.empty:
-            st.success(f"Conexão com a CVM estabelecida em tempo real! {len(df_cvm_estruturado)} contas principais filtradas.")
-            st.dataframe(df_cvm_estruturado[['CD_CONTA', 'DS_CONTA', 'VL_CONTA']].head(6), use_container_width=True, hide_index=True)
-        else:
-            st.info("Utilizando base de dados padrão conectada aos últimos demonstrativos divulgados.")
-    
+        st.subheader("📋 Composição do Score de Saúde (4 Pilares)")
+        st.markdown("Decomposição ponderada dos indicadores que formam a nota de saúde corporativa:")
+        
+        ml_atual = (info_hype.get('profitMargins', 0.18) or 0.18) * 100
+        roe_atual = (info_hype.get('returnOnEquity', 0.15) or 0.15) * 100
+        div_b = info_hype.get('totalDebt', 7e9) or 7e9
+        cx_b = info_hype.get('totalCash', 1.5e9) or 1.5e9
+        ebitda_b = info_hype.get('ebitda', 2.7e9) or 2.7e9
+        alav_atual = (div_b - cx_b) / ebitda_b if ebitda_b > 0 else 2.0
+        
+        df_pilares = pd.DataFrame({
+            "Pilar Avaliado": [
+                "1. Solvência (Altman Z''-Score)",
+                "2. Eficiência Operacional (Margem Líquida)",
+                "3. Estrutura de Capital (Dívida Líq./EBITDA)",
+                "4. Rentabilidade Patrimonial (ROE)"
+            ],
+            "Peso Máximo": ["35 pts", "25 pts", "25 pts", "15 pts"],
+            "Indicador Atual": [
+                f"{z_dict['z_score']:.2f} ({z_dict['zona']})",
+                f"{ml_atual:.1f}%",
+                f"{alav_atual:.2f}x",
+                f"{roe_atual:.1f}%"
+            ]
+        })
+        st.dataframe(df_pilares, use_container_width=True, hide_index=True)
+        st.info("💡 As demonstrações contábeis completas da CVM (DRE, Fluxo de Caixa e Endividamento) estão detalhadas no menu **Desempenho Financeiro**.")
+
 
 with tabs[1]:
-    st.title("📈 Módulo de Mercado & Cotações Reais — HYPE3 (B3)")
-    st.markdown("Dados de preços de fechamento e volume obtidos em tempo real via Yahoo Finance / B3.")
+    st.title("📈 Mercado, Macroeconomia & Análise Técnica — HYPE3 (B3)")
+    st.markdown("Acompanhamento integrado do cenário macroeconômico (BCB), cotações em tempo real e indicadores técnicos de tendência.")
     
-    st.subheader("🌐 Câmbio & Cenário Macroeconômico")
-    col_m1, col_m2, col_m3 = st.columns(3)
     macro_dados = carregar_indicadores_macro()
     dolar_dados = carregar_cotacao_dolar()
-    
-    with col_m1:
-        st.metric("Dólar (USD/BRL)", f"R$ {dolar_dados['Cotacao']:.4f}", f"{dolar_dados['Variacao']:.2f}%" if dolar_dados['Cotacao'] > 0 else "")
-    with col_m2:
-        st.metric("Taxa Selic (BCB)", macro_dados['Selic'])
-    with col_m3:
-        st.metric("IPCA Mensal (BCB)", macro_dados['IPCA'])
-    st.markdown("---")
     
     if not df_mercado_real.empty:
         cotacao_atual = df_mercado_real['Close'].iloc[-1]
         cotacao_anterior = df_mercado_real['Close'].iloc[-2]
         var_pct = ((cotacao_atual - cotacao_anterior) / cotacao_anterior) * 100
         
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Cotação Atual", f"R$ {cotacao_atual:.2f}", f"{var_pct:+.2f}%")
-        col2.metric("Máxima (Período)", f"R$ {df_mercado_real['High'].max():.2f}")
-        col3.metric("Mínima (Período)", f"R$ {df_mercado_real['Low'].min():.2f}")
-        col4.metric("Volume Médio", f"R$ {df_mercado_real['Volume'].mean():,.0f}")
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        col1.metric("HYPE3 Atual", f"R$ {cotacao_atual:.2f}", f"{var_pct:+.2f}%")
+        col2.metric("Máxima / Mínima (1A)", f"R$ {df_mercado_real['High'].max():.2f}", f"Mín: R$ {df_mercado_real['Low'].min():.2f}", delta_color="off")
+        col3.metric("Volume Médio Diário", f"R$ {df_mercado_real['Volume'].mean()/1e6:.1f} Mi")
+        col4.metric("Dólar (USD/BRL)", f"R$ {dolar_dados['Cotacao']:.2f}", f"{dolar_dados['Variacao']:+.2f}%" if dolar_dados['Cotacao'] > 0 else "")
+        col5.metric("Taxa Selic (BCB)", macro_dados['Selic'])
+        col6.metric("IPCA Mensal (BCB)", macro_dados['IPCA'])
         
         st.markdown("---")
-        st.subheader("📊 Gráfico Histórico de Preços (HYPE3.SA)")
         
-        df_mercado_real['MA_7'] = df_mercado_real['Close'].rolling(window=7).mean()
-        df_mercado_real['MA_21'] = df_mercado_real['Close'].rolling(window=21).mean()
+        modo_grafico = st.radio(
+            "Selecione a camada de visualização gráfica:",
+            ["📊 Tendência & Médias Móveis (MA 7d / 21d)", "📉 Bandas de Bollinger (20d) & IFR (14)"],
+            horizontal=True
+        )
         
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df_mercado_real['Date'], y=df_mercado_real['Close'], name="Fechamento Real", line=dict(color="#00d2ff")))
-        fig.add_trace(go.Scatter(x=df_mercado_real['Date'], y=df_mercado_real['MA_7'], name="Média Móvel 7d", line=dict(color="#ff7f0e", dash="dash")))
-        fig.update_layout( height=450, xaxis_title="Data", yaxis_title="Preço (R$)")
-        st.plotly_chart(fig, use_container_width=True)
+        df_at = df_mercado_real.copy()
+        if "Médias Móveis" in modo_grafico:
+            df_at['MA_7'] = df_at['Close'].rolling(window=7).mean()
+            df_at['MA_21'] = df_at['Close'].rolling(window=21).mean()
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df_at['Date'], y=df_at['Close'], name="Fechamento Real", line=dict(color="#00d2ff", width=2)))
+            fig.add_trace(go.Scatter(x=df_at['Date'], y=df_at['MA_7'], name="Média Móvel 7d", line=dict(color="#ff7f0e", dash="dash")))
+            fig.add_trace(go.Scatter(x=df_at['Date'], y=df_at['MA_21'], name="Média Móvel 21d", line=dict(color="#2ca02c", dash="dot")))
+            fig.update_layout(height=460, hovermode="x unified", xaxis_title="Data", yaxis_title="Preço (R$)", margin=dict(t=20, b=20))
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            window = 20
+            df_at['SMA'] = df_at['Close'].rolling(window=window).mean()
+            df_at['STD'] = df_at['Close'].rolling(window=window).std()
+            df_at['Banda_Superior'] = df_at['SMA'] + (df_at['STD'] * 2)
+            df_at['Banda_Inferior'] = df_at['SMA'] - (df_at['STD'] * 2)
+            
+            delta = df_at['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df_at['IFR'] = 100 - (100 / (1 + rs))
+            
+            fig_at = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.7, 0.3])
+            fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['Close'], name="Preço Fechamento", line=dict(color="#00d2ff")), row=1, col=1)
+            fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['Banda_Superior'], name="Banda Superior", line=dict(color="gray", dash="dot")), row=1, col=1)
+            fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['Banda_Inferior'], name="Banda Inferior", line=dict(color="gray", dash="dot"), fill='tonexty', fillcolor='rgba(100,100,100,0.1)'), row=1, col=1)
+            fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['IFR'], name="IFR (14)", line=dict(color="#ff7f0e")), row=2, col=1)
+            fig_at.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1, annotation_text="Sobrecompra (70)", annotation_position="top right")
+            fig_at.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1, annotation_text="Sobrevenda (30)", annotation_position="bottom right")
+            fig_at.update_layout(height=550, hovermode="x unified", margin=dict(t=20, b=20))
+            st.plotly_chart(fig_at, use_container_width=True)
     else:
         st.warning("Não foi possível conectar ao provedor de mercado no momento.")
-    
+
 
 with tabs[2]:
-    st.title("📊 Análise Técnica & Indicadores — HYPE3")
-    st.markdown("Estudo de momentum, volatilidade e tendências de curto e médio prazo.")
-    
-    if not df_mercado_real.empty:
-        df_at = df_mercado_real.copy()
-        window = 20
-        df_at['SMA'] = df_at['Close'].rolling(window=window).mean()
-        df_at['STD'] = df_at['Close'].rolling(window=window).std()
-        df_at['Banda_Superior'] = df_at['SMA'] + (df_at['STD'] * 2)
-        df_at['Banda_Inferior'] = df_at['SMA'] - (df_at['STD'] * 2)
-        
-        delta = df_at['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        df_at['IFR'] = 100 - (100 / (1 + rs))
-        
-        st.subheader("Bandas de Bollinger & IFR (14)")
-        fig_at = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1, row_heights=[0.7, 0.3])
-        fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['Close'], name="Preço Fechamento", line=dict(color="#00d2ff")), row=1, col=1)
-        fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['Banda_Superior'], name="Banda Superior", line=dict(color="gray", dash="dot")), row=1, col=1)
-        fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['Banda_Inferior'], name="Banda Inferior", line=dict(color="gray", dash="dot"), fill='tonexty', fillcolor='rgba(100,100,100,0.1)'), row=1, col=1)
-        fig_at.add_trace(go.Scatter(x=df_at['Date'], y=df_at['IFR'], name="IFR (14)", line=dict(color="#ff7f0e")), row=2, col=1)
-        fig_at.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1, annotation_text="Sobrecompra (70)", annotation_position="top right")
-        fig_at.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1, annotation_text="Sobrevenda (30)", annotation_position="bottom right")
-        fig_at.update_layout( height=600, hovermode="x unified", margin=dict(t=30, b=30))
-        st.plotly_chart(fig_at, use_container_width=True)
-    
-
-with tabs[3]:
     st.title("💊 Portfólio de Produtos & Sazonalidade Real de Vendas (HYPE3)")
     st.markdown("Comprovação empírica do comportamento de demanda e fluxo de saída de produtos ao longo das estações do ano com dados financeiros reais.")
     
@@ -264,7 +272,7 @@ with tabs[3]:
     st.dataframe(df_sazonalidade, use_container_width=True, hide_index=True)
 
 
-with tabs[4]:
+with tabs[3]:
     st.title("🌱 Sustentabilidade, ESG & ODS — Hypera Pharma")
     st.markdown("Painel integrado de sustentabilidade corporativa, governança e conformidade com os Objetivos de Desenvolvimento Sustentável (ODS) da ONU.")
     
@@ -276,11 +284,11 @@ with tabs[4]:
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric(label="Governança B3", value="Novo Mercado", delta="100% Tag Along")
-    with col2:
         st.metric(label="Índices de Sustentabilidade", value="ISE & ICO2 B3", delta="Carteira Oficial")
+    with col2:
+        st.metric(label="Pacto Global ONU", value="Signatária Ativa", delta="WEPs & ODS Prioritários")
     with col3:
-        st.metric(label="Pacto Global ONU", value="Signatária Ativa", delta="ODS Prioritários")
+        st.metric(label="Padrão de Relato", value="GRI & SASB", delta="Auditado por Terceiros")
     with col4:
         st.metric(label="Intensidade P&D Calculada", value=f"R$ {ped_real/1e6:.0f} Mi/ano", delta=f"{taxa_inovacao:.1f}% da Receita")
         

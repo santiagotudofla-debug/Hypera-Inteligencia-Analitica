@@ -6,25 +6,21 @@ from datetime import datetime
 from utils import (
     carregar_dados_mercado_real,
     carregar_demonstrativos_cvm_real,
-    carregar_noticias_yfinance,
     carregar_info_ticker,
     carregar_financials_ticker,
-    calcular_altman_z_score,
-    obter_dre_cvm_estruturado
+    calcular_altman_z_score
 )
 
-df_mercado_real = carregar_dados_mercado_real()
 ano_atual = datetime.now().year
 df_cvm_real = carregar_demonstrativos_cvm_real(ano_atual)
 if df_cvm_real.empty:
     df_cvm_real = carregar_demonstrativos_cvm_real(ano_atual - 1)
 
-df_cvm_estruturado = obter_dre_cvm_estruturado(df_cvm_real)
 info_alerta = carregar_info_ticker("HYPE3.SA")
 z_analise = calcular_altman_z_score(info_alerta)
 z_atual = z_analise["z_score"]
 
-tabs = st.tabs(["Alertas", "Anomalias", "Forecast", "Notícias (Ao Vivo)"])
+tabs = st.tabs(["🚨 Alertas", "🔎 Anomalias", "🔮 Forecast"])
 
 with tabs[0]:
     st.title("🚨 Central de Alertas & Monitoramento de Riscos — HYPE3")
@@ -265,16 +261,7 @@ with tabs[2]:
         st.metric(label="Modelo Preditivo", value="Regressão Linear (Numpy)", delta="Calibrado")
         
     st.markdown("---")
-    st.subheader("📈 Projeção Plurianual de Desempenho")
-    
-    df_forecast = pd.DataFrame({
-        "Período": anos_f,
-        "Receita Líquida (R$ Bi)": [round(r, 2) for r in rec_f],
-        "Lucro Líquido (R$ Bi)": [round(l, 2) for l in luc_f]
-    })
-    st.dataframe(df_forecast, use_container_width=True, hide_index=True)
-    
-    st.markdown("### Tendência Histórica e Projeção Preditiva")
+    st.subheader("📈 Tendência Histórica e Projeção Plurianual")
     
     fig_f = go.Figure()
     fig_f.add_trace(go.Scatter(x=anos_f, y=rec_f, name="Receita Líquida", line=dict(color="#00d2ff", width=2), mode='lines+markers+text', text=[f"R$ {v:.2f} Bi" for v in rec_f], textposition='top left'))
@@ -290,21 +277,3 @@ with tabs[2]:
     
     st.info("💡 Nota Analítica: A projeção linear reflete a taxa de expansão orgânica e o histórico de lucratividade consolidado pela Hypera Pharma nos últimos exercícios.")
 
-
-with tabs[3]:
-    st.title("📰 Notícias Financeiras & Radar de Mercado — HYPE3")
-    st.markdown("Feed de notícias recentes impactando o mercado e setor da Hypera Pharma, via Yahoo Finance.")
-    
-    noticias = carregar_noticias_yfinance("HYPE3.SA")
-    
-    if noticias:
-        for idx, noticia in enumerate(noticias):
-            st.subheader(noticia.get("title", f"Notícia {idx+1}"))
-            pub_time = noticia.get('providerPublishTime', 0)
-            dt_str = datetime.fromtimestamp(pub_time).strftime('%d/%m/%Y %H:%M') if pub_time else "Data Recente"
-            st.caption(f"Publicado por: **{noticia.get('publisher', 'Provedor Financeiro')}** em {dt_str}")
-            if noticia.get('link'):
-                st.markdown(f"[🔗 Ler notícia completa]({noticia['link']})")
-            st.markdown("---")
-    else:
-        st.warning("Não há notícias recentes disponíveis no provedor no momento.")

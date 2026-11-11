@@ -1,16 +1,15 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from utils import (
     carregar_dolar_historico,
     carregar_financials_ticker,
-    carregar_info_ticker
+    carregar_benchmarking_setorial
 )
 
-st.title("♟️ Análise Estratégica Setorial (2023-2026)")
-st.markdown("Comparativo histórico de perdas, ganhos e benchmarking competitivo contra as gigantes de saúde da B3.")
+st.title("♟️ Análise Estratégica & Benchmarking Setorial (2023-2026)")
+st.markdown("Comparativo histórico de eficiência operacional, pressão cambial em custos e posicionamento competitivo frente às gigantes de saúde da B3.")
 
 @st.cache_data(ttl=3600)
 def carregar_dados_historicos(ticker="HYPE3.SA"):
@@ -21,33 +20,7 @@ def carregar_dados_historicos(ticker="HYPE3.SA"):
         return fin
     return pd.DataFrame()
 
-@st.cache_data(ttl=3600)
-def carregar_benchmarking():
-    concorrentes = {
-        "HYPE3.SA": "Hypera",
-        "RADL3.SA": "Raia Drogasil",
-        "FLRY3.SA": "Fleury",
-        "PGMN3.SA": "Pague Menos"
-    }
-    
-    dados_setor = []
-    for ticker, nome in concorrentes.items():
-        try:
-            info = carregar_info_ticker(ticker)
-            rec = float(info.get('totalRevenue', 0.0) or 0.0) / 1e9
-            ml = float(info.get('profitMargins', 0.0) or 0.0) * 100
-            ebitda = float(info.get('ebitdaMargins', 0.0) or 0.0) * 100
-            dados_setor.append({
-                "Empresa": nome,
-                "Receita Total (Bi)": rec,
-                "Margem Líquida (%)": ml,
-                "Margem EBITDA (%)": ebitda
-            })
-        except Exception:
-            pass
-    return pd.DataFrame(dados_setor)
-
-tab1, tab2 = st.tabs(["📉 Histórico de Perdas e Ganhos (HYPE3)", "🏆 Benchmarking Setorial"])
+tab1, tab2 = st.tabs(["📉 Eficiência Operacional & Custos (HYPE3)", "🏆 Benchmarking Competitivo (B3)"])
 
 with tab1:
     st.subheader("Onde a empresa faturou vs. Onde ela perdeu capital")
@@ -199,64 +172,128 @@ with tab1:
         st.warning("Não foi possível carregar o histórico financeiro da B3 no momento.")
 
 with tab2:
-    st.subheader("Panorama de Mercado: Hypera vs. Concorrentes")
-    st.markdown("Como o nosso faturamento e lucratividade se compara com as outras gigantes de capital aberto?")
+    st.subheader("Panorama Competitivo: Hypera Pharma vs. Pares Listados na B3")
+    st.markdown("Análise comparativa consolidada de escala de faturamento, rentabilidade operacional, alavancagem e múltiplos de valuation.")
     
-    df_bench = carregar_benchmarking()
+    df_setor_completo = carregar_benchmarking_setorial()
     
-    if not df_bench.empty:
-        col1, col2 = st.columns([2, 1])
+    if not df_setor_completo.empty:
+        df_empresas = df_setor_completo.copy()
         
+        # Posição em Margem Líquida
+        df_empresas['Rank_ML'] = df_empresas['Margem Líquida (%)'].rank(ascending=False, method='min')
+        pos_ml = int(df_empresas.loc[df_empresas['Empresa / Ticker'].str.contains('Hypera'), 'Rank_ML'].iloc[0]) if any(df_empresas['Empresa / Ticker'].str.contains('Hypera')) else 1
+        
+        # Médias setoriais
+        media_ml = round(float(df_empresas["Margem Líquida (%)"].mean()), 1)
+        media_roic = round(float(df_empresas["ROIC (%)"].mean()), 1)
+        media_alav = round(float(df_empresas["Dívida Líq. / EBITDA"].mean()), 2)
+        media_pl = round(float(df_empresas["P/L (Preço / Lucro)"].mean()), 1)
+        
+        hype_row = df_empresas.loc[df_empresas['Empresa / Ticker'].str.contains('Hypera')].iloc[0]
+        hype_ml = hype_row['Margem Líquida (%)']
+        hype_roic = hype_row['ROIC (%)']
+        hype_alav = hype_row['Dívida Líq. / EBITDA']
+        hype_pl = hype_row['P/L (Preço / Lucro)']
+        
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            fig_setor = go.Figure()
+            st.metric(
+                label="Ranking em Margem Líquida",
+                value=f"{pos_ml}º / {len(df_empresas)}",
+                delta=f"{hype_ml:.1f}% vs {media_ml:.1f}% (Média)"
+            )
+        with col2:
+            st.metric(
+                label="ROIC vs Setor",
+                value=f"{hype_roic:.1f}% vs {media_roic:.1f}%",
+                delta=f"{hype_roic - media_roic:+.1f}%"
+            )
+        with col3:
+            st.metric(
+                label="Alavancagem vs Média",
+                value=f"{hype_alav:.2f}x vs {media_alav:.2f}x",
+                delta=f"{hype_alav - media_alav:+.2f}x",
+                delta_color="inverse"
+            )
+        with col4:
+            st.metric(
+                label="P/L vs Média Setorial",
+                value=f"{hype_pl:.1f}x vs {media_pl:.1f}x",
+                delta=f"{hype_pl - media_pl:+.1f}x",
+                delta_color="inverse"
+            )
             
-            # Gráfico de barras para Receita
+        st.markdown("---")
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            st.markdown("#### 📊 Escala de Receita vs. Margem Líquida")
+            fig_setor = go.Figure()
             fig_setor.add_trace(go.Bar(
-                x=df_bench['Empresa'],
-                y=df_bench['Receita Total (Bi)'],
-                name="Receita Total Anualizada",
-                marker_color=['#00d2ff' if emp == 'Hypera' else 'gray' for emp in df_bench['Empresa']],
-                text=[f"R$ {v:.1f} Bi" for v in df_bench['Receita Total (Bi)']],
+                x=df_empresas['Empresa / Ticker'],
+                y=df_empresas['Receita Total (Bi)'],
+                name="Receita Total (Bi)",
+                marker_color=['#00d2ff' if 'Hypera' in emp else 'gray' for emp in df_empresas['Empresa / Ticker']],
+                text=[f"R$ {v:.1f} Bi" for v in df_empresas['Receita Total (Bi)']],
                 textposition='auto',
                 yaxis='y1'
             ))
-            
-            # Gráfico de linha para Margem Líquida
             fig_setor.add_trace(go.Scatter(
-                x=df_bench['Empresa'],
-                y=df_bench['Margem Líquida (%)'],
+                x=df_empresas['Empresa / Ticker'],
+                y=df_empresas['Margem Líquida (%)'],
                 name="Margem Líquida (%)",
                 line=dict(color='#ff7f0e', width=3),
                 mode='lines+markers+text',
-                text=[f"{v:.1f}%" for v in df_bench['Margem Líquida (%)']],
+                text=[f"{v:.1f}%" for v in df_empresas['Margem Líquida (%)']],
                 textposition='top center',
                 yaxis='y2'
             ))
-
             fig_setor.update_layout(
-                height=450,
+                height=420,
                 yaxis=dict(title="Receita (R$ Bilhões)", side="left"),
-                yaxis2=dict(title="Margem Líquida (%)", overlaying="y", side="right", range=[0, 30]),
-                margin=dict(t=20, b=20, l=40, r=40),
-                legend=dict(x=0.01, y=0.99, bgcolor='rgba(0,0,0,0.5)')
+                yaxis2=dict(title="Margem Líquida (%)", overlaying="y", side="right", range=[0, max(30, float(df_empresas['Margem Líquida (%)'].max()) + 8)], showgrid=False),
+                margin=dict(t=30, b=20, l=20, r=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
             )
             st.plotly_chart(fig_setor, use_container_width=True)
             
-        with col2:
-            st.markdown("### 🏆 Destaques do Setor")
-            
-            maior_rec = df_bench.loc[df_bench['Receita Total (Bi)'].idxmax()]
-            maior_mar = df_bench.loc[df_bench['Margem Líquida (%)'].idxmax()]
-            
-            st.metric(label="Líder em Volume (Faturamento)", value=maior_rec['Empresa'], delta=f"R$ {maior_rec['Receita Total (Bi)']:.1f} Bi", delta_color="normal")
-            st.metric(label="Líder em Eficiência (Margem Líquida)", value=maior_mar['Empresa'], delta=f"{maior_mar['Margem Líquida (%)']:.1f}%", delta_color="normal")
-            
-            st.markdown("---")
-            st.markdown(
-                "**Veredito Estratégico:**\n"
-                "Embora o varejo (como a Raia Drogasil) possua um *faturamento bruto* muito superior por ser a ponta final da cadeia de consumo, "
-                "a Hypera se destaca com uma **margem líquida significativamente maior**, já que atua na produção industrial das patentes e medicamentos de alto valor agregado."
+        with col_g2:
+            st.markdown("#### 📊 Rentabilidade Operacional: Margem vs. ROIC")
+            fig_setor_bench = go.Figure(data=[
+                go.Bar(name='Margem Líquida (%)', x=df_empresas['Empresa / Ticker'], y=df_empresas['Margem Líquida (%)'], marker_color='#1f77b4'),
+                go.Bar(name='ROIC (%)', x=df_empresas['Empresa / Ticker'], y=df_empresas['ROIC (%)'], marker_color='#2ca02c')
+            ])
+            fig_setor_bench.update_layout(
+                barmode='group',
+                height=420,
+                margin=dict(t=30, b=20, l=20, r=20),
+                yaxis_title="Percentual (%)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
             )
+            st.plotly_chart(fig_setor_bench, use_container_width=True)
             
+        st.markdown("---")
+        st.subheader("📋 Matriz Comparativa de Pares (Saúde & Farmacêutico B3)")
+        
+        df_media_row = pd.DataFrame([{
+            "Empresa / Ticker": "📊 Média do Setor",
+            "Receita Total (Bi)": round(df_empresas["Receita Total (Bi)"].mean(), 2),
+            "Margem Líquida (%)": media_ml,
+            "Margem EBITDA (%)": round(df_empresas["Margem EBITDA (%)"].mean(), 1),
+            "ROE (%)": round(df_empresas["ROE (%)"].mean(), 1),
+            "ROIC (%)": media_roic,
+            "Dívida Líq. / EBITDA": media_alav,
+            "P/L (Preço / Lucro)": media_pl
+        }])
+        
+        cols_show = ["Empresa / Ticker", "Receita Total (Bi)", "Margem Líquida (%)", "Margem EBITDA (%)", "ROIC (%)", "Dívida Líq. / EBITDA", "P/L (Preço / Lucro)"]
+        df_exibir = pd.concat([df_empresas[cols_show], df_media_row[cols_show]], ignore_index=True)
+        st.dataframe(df_exibir, use_container_width=True, hide_index=True)
+        
+        st.info(
+            "💡 **Veredito Estratégico:** Embora o varejo farmacêutico (como RaiaDrogasil e Pague Menos) apresente maior volume de receita bruta por operar na ponta final de distribuição, "
+            "a **Hypera Pharma** captura margens operacionais e retorno sobre o capital (ROIC) substancialmente superiores graças à propriedade intelectual de marcas líderes e fabricação própria."
+        )
     else:
         st.warning("Erro ao carregar dados do setor.")
